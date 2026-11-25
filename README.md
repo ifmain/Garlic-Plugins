@@ -4,7 +4,7 @@ Build extensions for [Garlic Alpha](https://github.com/ifmain/Garlic) on Android
 
 | Example | Entry point | What it does |
 | --- | --- | --- |
-| [Dev Connection](examples/dev-connection/main.c) | `route_next` | Chooses between the built-in route pool and the user's additional Garlic connections. |
+| [Dev Connection](examples/dev-connection/main.c) | `route_next` | Adds user-configured HTTP CONNECT, HTTPS CONNECT, SOCKS4a, SOCKS5 and SSH fallback routes. Includes an end-to-end connection test. |
 | [Pong](examples/pong/main.c) | `ui_frame` | Draws an interactive game. Drag the left paddle with a finger or mouse. |
 
 ## Build your first plugin

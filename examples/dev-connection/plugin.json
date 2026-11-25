@@ -1,1 +1,1 @@
-{"id":"dev-connection","name":"Dev Connection","capability":"network"}
+{"id":"dev-connection","name":"Dev Connection","capability":"network","transports":["http","https","socks4","socks5","ssh"]}
