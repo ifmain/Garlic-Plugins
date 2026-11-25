@@ -1,1 +1,20 @@
-{"id":"dev-connection","name":"Dev Connection","capability":"network","transports":["http","https","socks4","socks5","ssh"]}
+{
+  "id": "dev-connection",
+  "name": "Dev Connection",
+  "capability": "network",
+  "transports": [
+    "http",
+    "https",
+    "socks4",
+    "socks5",
+    "ssh"
+  ],
+  "wire_abi": 1,
+  "layers": {
+    "http": "tcp",
+    "https": "tls",
+    "socks4": "tcp",
+    "socks5": "tcp",
+    "ssh": "ssh"
+  }
+}

@@ -22,9 +22,13 @@ def b64(data):
 def compile_payload(project, clang):
     meta = json.loads((project / "plugin.json").read_text(encoding="utf-8"))
     transports = meta.get("transports", [])
-    if not isinstance(transports,list) or any(x not in ("http","https","socks4","socks5","ssh") for x in transports) or (transports and meta["capability"] != "network"):
+    layers = meta.get("layers", {})
+    wire = meta.get("wire_abi") == 1
+    if wire and (set(layers) != set(transports) or not transports or any(v not in ("tcp","tls","ssh") for v in layers.values())):
+        raise ValueError("invalid stream layers")
+    if not isinstance(transports,list) or any(not re.fullmatch(r"[a-z][a-z0-9-]{0,31}",x) or x in ("direct","ingress") for x in transports) or (transports and meta["capability"] != "network"):
         raise ValueError("invalid transport capabilities")
-    if set(meta) - {"transports"} != {"id", "name", "capability"} or not re.fullmatch("[a-z0-9-]{1,48}", meta["id"]):
+    if set(meta) - {"transports","layers","wire_abi"} != {"id", "name", "capability"} or not re.fullmatch("[a-z0-9-]{1,48}", meta["id"]):
         raise ValueError("invalid plugin manifest")
     if not 1 <= len(meta["name"]) <= 80:
         raise ValueError("invalid plugin name")
@@ -34,11 +38,11 @@ def compile_payload(project, clang):
         src = sorted(project.glob("*.c"))
         subprocess.run([clang, "--target=wasm32", "-Oz", "-nostdlib", "-I", str(ROOT / "sdk"),
                         "-Wl,--no-entry,--strip-all,--export-memory,--max-memory=131072",
-                        "-Wl,--export=" + export, *(["-Wl,--export=route_transport"] if transports else []), *src, "-o", output], check=True)
+                        "-Wl,--export=" + export, *(["-Wl,--export=net_buffer,--export=net_step"] if wire else ["-Wl,--export=route_transport"] if transports else []), *src, "-o", output], check=True)
         code = output.read_bytes()
     if len(code) > 6144:
         raise ValueError("module exceeds 6144-byte limit")
-    return json.dumps(dict(meta, format="gpf/3", wasm=b64(code)), ensure_ascii=False,
+    return json.dumps(dict(meta, format="gpf/4" if wire else "gpf/3", wasm=b64(code)), ensure_ascii=False,
                       separators=(",", ":")).encode("utf-8")
 
 
