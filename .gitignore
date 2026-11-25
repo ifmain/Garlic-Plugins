@@ -1,0 +1,5 @@
+build/
+*.pem
+*.p12
+.venv/
+__pycache__/
