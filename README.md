@@ -1,55 +1,28 @@
 # Garlic Plugins
 
-Инструменты и примеры для авторов плагинов Garlic Alpha **0.9.10** (Windows x64 и Android). Каждый пример собирается в отдельный подписанный GPF. Пользователь устанавливает файл через **Плагины → Установить GPF**, видит имя, возможности и отпечаток ключа автора. Пакеты примеров доступны в [релизах](https://github.com/ifmain/Garlic-Plugins/releases). Клиент доступен в [репозитории Garlic](https://github.com/ifmain/Garlic/releases).
+Build extensions for [Garlic Alpha](https://github.com/ifmain/Garlic) on Android and Windows. Each plugin is a signed GPF file installed through **Plugins → Install GPF**. [Download the examples](https://github.com/ifmain/Garlic-Plugins/releases) · [Русский](README.ru.md)
 
-| Пример | Что проверить после установки |
-| --- | --- |
-| [Dev Connection](examples/dev-connection/main.c) | В настройках добавьте адрес Garlic, тип маршрута и ключ. При новом TCP-потоке плагин предпочитает доступное дополнительное подключение. При допустимом повторе выбирает основной пул VPN. |
-| [Pong](examples/pong/main.c) | Откройте настройки включённого плагина. Перемещайте левую ракетку, удерживая палец или левую кнопку мыши. Правая ракетка играет автоматически. Голы отображаются над полем. |
+| Example | Entry point | What it does |
+| --- | --- | --- |
+| [Dev Connection](examples/dev-connection/main.c) | `route_next` | Chooses between the built-in route pool and the user's additional Garlic connections. |
+| [Pong](examples/pong/main.c) | `ui_frame` | Draws an interactive game. Drag the left paddle with a finger or mouse. |
 
-## Собрать и установить свой плагин
+## Build your first plugin
 
-Понадобятся Python 3.10+, Clang с поддержкой wasm32 и линкер wasm-ld. Подходит Clang из Android NDK r27. Запускайте команды из корня этого репозитория.
+Install Python 3.10+, Clang with wasm32 support and wasm-ld. Run these commands from the repository root.
 
-```sh
+~~~sh
 python -m pip install -r requirements.txt
 python tools/gpf.py keygen author.pem
 python tools/gpf.py build examples/pong --key author.pem -o build/pong.gpf
-python tools/gpf.py build examples/dev-connection --key author.pem -o build/dev-connection.gpf
-```
+~~~
 
-Если clang отсутствует в PATH, добавьте к команде сборки `--clang "/путь/к/clang"`. На Windows можно передать полный путь к `clang.exe`. Инструмент собирает все файлы `.c` в каталоге примера, добавляет заголовки SDK, проверяет размер модуля и подписывает пакет. Для первого проекта скопируйте один из каталогов `examples`, измените `id` и `name` в `plugin.json` и реализуйте нужную функцию из [garlic.h](sdk/garlic.h).
+Install the GPF, enable the plugin and open its settings. To make it your own, copy the example directory, change the ID and name in `plugin.json`, then implement an entry point from the [SDK header](sdk/garlic.h). Keep the author key private. Use the same key and ID to update your plugin. [Example publisher fingerprint](PUBLISHER.sha256)
 
-Для сборки используется собственный ключ автора. Храните `author.pem` и его пароль у себя. Для неинтерактивной сборки можно передать пароль через переменную окружения `GARLIC_PLUGIN_PASSPHRASE`. Передавайте пользователям файл GPF и отдельно опубликуйте отпечаток ключа. Для образцов этого репозитория отпечаток находится в [PUBLISHER.sha256](PUBLISHER.sha256).
+Network plugins receive route availability and the attempt number. The host owns the credentials and opens the connection. Canvas plugins receive pointer input and return rectangles in Wasm memory. [Full GPF 3 format and ABI guide in Russian](README.ru.md)
 
-## Контракт подключения
+## Contributing
 
-Укажите `"capability":"network"`. Для каждого нового потока хост готовит список доступных кандидатов и перед попыткой открытия вызывает:
+I welcome feedback on the SDK, ideas for new hooks, example plugins and pull requests. To propose an ABI change, describe the plugin you want to build and the host capability it needs. [Open an issue](https://github.com/ifmain/Garlic-Plugins/issues)
 
-```c
-int32_t route_next(int32_t primary_available, int32_t additional_available, int32_t attempt);
-```
-
-Первые два аргумента равны 0 или 1. Основной пул принадлежит VPN, дополнительный пул состоит из подключений этого слота, настроенных пользователем. Номер первой попытки равен нулю. Верните `GARLIC_CONTINUE`, чтобы сохранить предыдущий выбор, `GARLIC_PRIMARY` для основного пула или `GARLIC_ADDITIONAL` для своего дополнительного пула. Хост выбирает первый доступный маршрут указанной категории. После допустимого отказа он исключает использованный маршрут и снова вызывает функцию. Для открытого потока данные продолжают идти через выбранное соединение.
-
-Сетевые хуки исполняются в порядке идентификаторов слотов. Последний применимый выбор имеет приоритет. Недоступная категория, неизвестный результат или ошибка исполнения сохраняют предыдущий выбор. Хост проверяет ограничения авторизации. Плагин получает признаки доступности и номер попытки. Ключи, сокет и содержимое трафика остаются у хоста. Эта версия предоставляет подключение через транспорт Garlic; интерфейса реализации SSH или V2Ray с нуля в данном ABI нет.
-
-## Контракт экрана
-
-Укажите `"capability":"canvas"` и экспортируйте память под именем `memory`. Пока страница видима, хост передаёт кадры одному экземпляру модуля. Глобальные переменные сохраняются между вызовами.
-
-```c
-GarlicFrame *ui_frame(int32_t x, int32_t y, int32_t pressed, int32_t elapsed_ms);
-```
-
-Поле имеет логический размер 320 × 240. Координаты относятся только к этой поверхности. `pressed` сообщает о нажатии мыши или касании, `elapsed_ms` ограничен диапазоном 0–100. На выходе верните адрес структуры в линейной памяти Wasm. Первое слово — количество прямоугольников (0–128), затем для каждого пять i32 в little-endian: координаты x и y, ширина, высота и RGB. Хост проверяет границы памяти, рисует кадр и прекращает вызовы при закрытии страницы. Некорректный адрес, слишком длинный кадр или исчерпание бюджета останавливают экземпляр. Новый вход на страницу начинает новую сессию.
-
-Стандартные карточка, переключатель, навигация и операции JSON рисуются клиентом. Собственную интерактивную область рисует модуль. События вне его страницы, данные других плагинов и системные датчики в эту версию ABI не входят.
-
-## Формат, доверие и ограничения
-
-GPF 3 — JSON с полями `author`, `payload` и `signature` в base64. `author` содержит 384-байтовый RSA-модуль, публичная экспонента равна 65537. Отпечаток — SHA-256 этих 384 байтов. Подпись RSA PKCS#1 v1.5/SHA-256 покрывает исходные байты payload до разбора JSON. Payload содержит `format: "gpf/3"`, `id`, `name`, `capability` и бинарный WebAssembly в поле `wasm`. Идентификатор состоит из 1–48 строчных латинских букв, цифр или дефисов.
-
-При обновлении используйте прежние идентификатор и ключ автора. Клиент отклоняет замену существующего слота пакетом другого издателя. Удаление слота удаляет его регистрацию. Для установки новой версии снова выберите GPF. Данные подключений и переключатель сохраняются при обновлении. JSON-экспорт настроек исключает ключи подключения и исполняемый модуль.
-
-Интерпретатор предоставляет 128 КиБ линейной памяти и 20 000 единиц исполнения на вызов. Размер Wasm ограничен 6 КиБ. Импорты и start-функция запрещены. ABI сети и ABI экрана не дают модулю файловую систему или запуск процессов. Для проверки измените логику одного примера, пересоберите **только GPF**, установите его поверх предыдущего и откройте страницу заново либо переподключите VPN.
+The original SDK, tools and examples are licensed under [Apache License 2.0](LICENSE). Dependencies retain their own licenses.
